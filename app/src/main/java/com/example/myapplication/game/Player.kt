@@ -27,14 +27,14 @@ class Player(var main:MutableList<String> = mutableListOf(), var value:Int = 0, 
     fun setCheatScore(decision:String, i:Int){
         setValue()
         when (decision) {
-            "je prends" -> {
+            "prendre" -> {
                 nbChoix += 1
                 when{
                     (i>=5 && value>14) -> cheatScore = (cheatScore * (nbChoix - 1) + 1) / nbChoix
                     (i<5 && value>14) -> cheatScore = (cheatScore * (nbChoix - 1)) / nbChoix
                 }
             }
-            "je passe" -> {
+            "passer" -> {
                 nbChoix += 1
                 when{
                     (i>=-5 && value<=14) -> cheatScore = (cheatScore * (nbChoix - 1)) / nbChoix

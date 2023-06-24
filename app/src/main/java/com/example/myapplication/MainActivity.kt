@@ -11,110 +11,121 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import com.example.myapplication.game.Game
 import com.example.myapplication.game.Player
 import org.w3c.dom.Text
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.speech.RecognitionListener
+import android.speech.SpeechRecognizer
+import android.widget.Button
+import android.widget.EditText
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
     val game: Game=Game()
     var lastId: Int = 0
     var i:Int = 10
+    private var speechRecognizer:SpeechRecognizer?=null
+    private var editText: EditText?= null
+    private var btn : Button? = null
+    private var voiceCommand : TextView? = null
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val btnSpeak = findViewById<ImageButton>(R.id.btnSpeak)
-        val tvText = findViewById<TextView>(R.id.tvText)
-        btnSpeak.setOnClickListener {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            intent.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)!=
+            PackageManager.PERMISSION_GRANTED){
+            checkPermissions()
+        }
+        editText = findViewById<EditText>(R.id.text)
+        btn = findViewById<Button>(R.id.btnRegister)
+        voiceCommand = findViewById<TextView>(R.id.command)
+        speechRecognizer =SpeechRecognizer.createSpeechRecognizer(this)
+        val speechRecognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+
+        speechRecognizer!!.setRecognitionListener(object :RecognitionListener{
+            override fun onReadyForSpeech(params: Bundle?) {
+                //Toast.makeText(applicationContext, "ready for speech", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onBeginningOfSpeech() {
+                editText!!.setText("")
+                editText!!.setHint("listening")
+            }
+
+
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {
+            }
+
+            override fun onError(error: Int) {
+                Toast.makeText(applicationContext, "error", Toast.LENGTH_SHORT).show()
+                speechRecognizer!!.startListening(speechRecognizerIntent)
+            }
+
+            override fun onResults(results: Bundle?) {
+                if(results!=null) {
+                    val data = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    if (data != null && data.isNotEmpty()) {
+                        editText!!.setText(data!![0])
+                        voiceCommand!!.text = data!![0]
+                        handleCommand(data!![0])
+                        Log.i("data", data!![0])
+                    }
+                }
+                speechRecognizer!!.startListening(speechRecognizerIntent)
+            }
+
+
+            override fun onPartialResults(partialResults: Bundle?) {}
+
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+
+        })
+
+        btn!!.setOnClickListener { speechRecognizer!!.startListening(speechRecognizerIntent) }
+
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        speechRecognizer!!.destroy()
+    }
+
+
+    private fun checkPermissions() {
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            ActivityCompat.requestPermissions(
+                this,arrayOf(Manifest.permission.RECORD_AUDIO),
+                RecordAudioRequestCode
             )
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
-            try {
-                startActivityForResult(intent, RESULT_SPEECH)
-                tvText.setText("")
-            } catch (e: ActivityNotFoundException) {
-                Toast.makeText(
-                    applicationContext,
-                    "Your device doesn't support Speech to Text",
-                    Toast.LENGTH_SHORT
-                ).show()
-                e.printStackTrace()
-            }
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        val tvText = findViewById<TextView>(R.id.tvText)
-        val champId = findViewById<TextView>(R.id.idPlayer)
-        val champMain = findViewById<TextView>(R.id.mainPlayer)
-        val champCheatScore = findViewById<TextView>(R.id.cheatScorePlayer)
-        val champNbChoix = findViewById<TextView>(R.id.nbChoixPlayer)
-        when (requestCode) {
-            RESULT_SPEECH -> if (resultCode == RESULT_OK && data != null) {
-                val text = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                tvText!!.text = text!![0]
-                if (game.players.size>0){
-                    val player = game.players[0]
-                    champId.text="id: ${player.id}"
-                    champCheatScore.text="id: ${player.cheatScore}"
-                    champNbChoix.text="id: ${player.nbChoix}"
-                }
-                when(text[0]){
-                    "bonjour"-> {Log.i("bonjour:", text[0])
-                        game.players.add(Player(id=lastId+1))
-                        lastId+=1
-                        startRegister()
-                    }
-                    "distribution"-> {
-                        val player:Player = game.players[0]?:Player(id=-1)
-                        if (player.id>-1){
-                        var card = "10" //on recupere la carte en scannant
-                        player.addCard(card)
-                        setI(card)
-                        card = "7" //on recupere la carte en scannant
-                        player.addCard(card)
-                        setI(card)
-                    }}
-                    "je prends"->{ val player:Player = game.players[0]?:Player(id=-1)
-                        if (player.id>-1) player.setCheatScore("prendre", i)
-                    }
-                    "je passe"-> { val player:Player = game.players[0]?:Player(id=-1)
-                        if (player.id>-1) player.setCheatScore("passer", i)}
-                    else-> {val player:Player = game.players[0]?:Player(id=-1)
-                        tvText!!.text = player.toString()}
-                }
-            }
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == RecordAudioRequestCode && grantResults.isNotEmpty()){
+            Toast.makeText(this,"Permission Granted",Toast.LENGTH_LONG).show()
         }
-
     }
 
-    companion object {
-        protected const val RESULT_SPEECH = 1
-    }
-
-    fun startRegister(){
-        val tvText = findViewById<TextView>(R.id.tvText)
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-        intent.putExtra(
-            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-        )
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
-        try {
-            startActivityForResult(intent, RESULT_SPEECH)
-            tvText.setText("")
-        } catch (e: ActivityNotFoundException) {
-            Toast.makeText(
-                applicationContext,
-                "Your device doesn't support Speech to Text",
-                Toast.LENGTH_SHORT
-            ).show()
-            e.printStackTrace()
-        }
+    companion object{
+        const val RecordAudioRequestCode = 1
     }
 
     private fun setI(card:String){
@@ -123,4 +134,33 @@ class MainActivity : AppCompatActivity() {
             (card.toInt() in 2..6)->i-=1
         }
     }
+
+    private fun handleCommand(command: String) {
+        Log.i("commande:", command)
+        when(command){
+            "bonjour"-> {
+                game.players.add(Player(id=lastId+1))
+                lastId+=1
+                Log.i("player:", game.players[0].toString())
+            }
+            "distribution"-> {
+                val player:Player = game.players[0]?:Player(id=-1)
+                if (player.id>-1){
+                    var card = "10" //on recupere la carte en scannant
+                    player.addCard(card)
+                    setI(card)
+                    card = "7" //on recupere la carte en scannant
+                    player.addCard(card)
+                    setI(card)
+                }}
+            "je prends"->{ val player:Player = game.players[0]?:Player(id=-1)
+                if (player.id>-1) player.setCheatScore("prendre", i)
+            }
+            "je passe"-> { val player:Player = game.players[0]?:Player(id=-1)
+                if (player.id>-1) player.setCheatScore("passer", i)}
+            else-> {Log.i("player",game.players[0].toString())}
+        }
+
+    }
+
 }
