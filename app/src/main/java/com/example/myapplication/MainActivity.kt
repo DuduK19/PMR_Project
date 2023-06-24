@@ -1,20 +1,15 @@
 package com.example.myapplication
 
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.util.Log
-import android.view.View
-import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
-import androidx.annotation.Nullable
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.example.myapplication.game.Game
 import com.example.myapplication.game.Player
-import org.w3c.dom.Text
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -32,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     private var editText: EditText?= null
     private var btn : Button? = null
     private var voiceCommand : TextView? = null
+    private var keepListening : Boolean = true
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +53,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onBeginningOfSpeech() {
+
                 editText!!.setText("")
                 editText!!.setHint("listening")
             }
@@ -70,20 +67,24 @@ class MainActivity : AppCompatActivity() {
 
             override fun onError(error: Int) {
                 Toast.makeText(applicationContext, "error", Toast.LENGTH_SHORT).show()
-                speechRecognizer!!.startListening(speechRecognizerIntent)
+                if (keepListening) speechRecognizer!!.startListening(speechRecognizerIntent)
             }
 
             override fun onResults(results: Bundle?) {
+
                 if(results!=null) {
                     val data = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     if (data != null && data.isNotEmpty()) {
-                        editText!!.setText(data!![0])
-                        voiceCommand!!.text = data!![0]
-                        handleCommand(data!![0])
-                        Log.i("data", data!![0])
+                        val commande = data!![0]
+                        editText!!.setText(commande)
+                        voiceCommand!!.text = commande
+                        handleCommand(commande)
+                        Log.i("data", commande)
                     }
                 }
-                speechRecognizer!!.startListening(speechRecognizerIntent)
+                if (keepListening) speechRecognizer!!.startListening(speechRecognizerIntent)
+                else {Log.i("message","fini")
+                    speechRecognizer!!.stopListening()}
             }
 
 
@@ -158,6 +159,7 @@ class MainActivity : AppCompatActivity() {
             }
             "je passe"-> { val player:Player = game.players[0]?:Player(id=-1)
                 if (player.id>-1) player.setCheatScore("passer", i)}
+            "fin de la partie"-> keepListening = false
             else-> {Log.i("player",game.players[0].toString())}
         }
 
